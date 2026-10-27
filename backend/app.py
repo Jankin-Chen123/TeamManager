@@ -174,6 +174,7 @@ def create_app(settings=None):
             secure=settings.cookie_secure,
             samesite="strict",
             max_age=settings.session_hours * 3600,
+            path=settings.cookie_path,
         )
         return {"csrf": csrf}
 
@@ -284,7 +285,7 @@ def create_app(settings=None):
     def logout(response: Response, session=Depends(authenticated)):
         with factory.begin() as db:
             db.execute(delete(Session).where(Session.id == session.id))
-        response.delete_cookie("tm_session")
+        response.delete_cookie("tm_session", path=settings.cookie_path)
         return {"ok": True}
 
     @router.post("/password")
@@ -765,6 +766,7 @@ def create_app(settings=None):
     app.include_router(router)
     if settings.frontend_dir.exists():
         app.mount("/assets", StaticFiles(directory=settings.frontend_dir / "assets"), name="assets")
+        app.mount("/TeamManager/assets", StaticFiles(directory=settings.frontend_dir / "assets"), name="shared-assets")
 
     @app.get("/{path:path}")
     def index(path: str):

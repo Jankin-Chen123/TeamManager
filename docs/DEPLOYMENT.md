@@ -1,5 +1,7 @@
 # 部署、升级与恢复
 
+与现有 sub2api 共用 `aibaipiao.top` 的 `/JoinTeam`、`/TeamManager` 路径部署，以及可选的 Tailscale 自动部署，见 [共享域名部署](SHARED-DOMAIN.md)。
+
 ## 本机 Windows
 
 运行根目录 `start.cmd`。脚本会创建 Python 虚拟环境、安装依赖、初始化 `.env`、构建前端，最后启动 <http://127.0.0.1:8765>。

@@ -8,7 +8,8 @@ permissions:
   contents: read
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Do not interrupt a production update after the old container is stopped.
+  cancel-in-progress: false
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -62,6 +63,8 @@ jobs:
     if: github.event_name == 'push'
     needs: verify
     runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.image.outputs.digest }}
     permissions:
       contents: read
       packages: write
@@ -103,3 +106,56 @@ jobs:
           print('\n更新前备份数据库及主密钥；运行 `sh scripts/update.sh <版本镜像或摘要>`。')
           print('\n更新与回退步骤见仓库 `docs/DEPLOYMENT.md`；真实空间验证单独执行。')
           PY
+  deploy:
+    name: Deploy over Tailscale
+    needs: [verify, publish]
+    if: github.ref == 'refs/heads/main' && vars.TM_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: teammanager-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Connect deployment device to Tailnet
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:teammanager-deploy
+      - name: Configure dedicated SSH identity
+        env:
+          DEPLOY_KEY: ${{ secrets.TM_DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.TM_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<'EOF'
+          Host tm-production
+            HostName 100.77.109.30
+            User teammanager-deploy
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            BatchMode yes
+            StrictHostKeyChecking yes
+            ConnectTimeout 20
+          EOF
+      - name: Install deployment files and update checked image
+        env:
+          IMAGE_DIGEST: ${{ needs.publish.outputs.digest }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${REPOSITORY,,}@${IMAGE_DIGEST}"
+          tar -cf - compose.yaml scripts/update.sh scripts/deploy.sh | ssh tm-production 'mkdir -p /opt/teammanager && tar -xf - -C /opt/teammanager'
+          ssh tm-production "cd /opt/teammanager && sh scripts/deploy.sh '$image'"
+      - name: Check public routes
+        run: |
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 https://aibaipiao.top/TeamManager/api/health
+          curl --fail --silent --show-error https://aibaipiao.top/JoinTeam > /dev/null
+          curl --fail --silent --show-error https://aibaipiao.top/TeamManager/ > /dev/null
+      - name: Remove SSH identity
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

@@ -3,6 +3,8 @@ WORKDIR /build
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ ./
+ARG TM_WEB_BASE=/TeamManager/
+ENV TM_WEB_BASE=$TM_WEB_BASE
 RUN npm run build
 
 FROM python:3.12-slim-bookworm AS runtime

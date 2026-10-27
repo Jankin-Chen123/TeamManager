@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import logoUrl from "./assets/teammanager.png";
 import NavIcon from "./NavIcon.vue";
+import { apiBase, joinUrl } from "./paths";
 import { readSnapshot, writeSnapshot, removeSpaceSnapshots, type Snapshot } from "./snapshots";
 
 type Node = {
@@ -401,7 +402,7 @@ const title = computed(() =>
 );
 
 async function api(path: string, method = "GET", body?: unknown): Promise<any> {
-  const response = await fetch("/api" + path, {
+  const response = await fetch(apiBase + path, {
     method,
     credentials: "same-origin",
     headers: {
@@ -1449,7 +1450,7 @@ watch(modal, () => {
         >
         <template v-else-if="section === 'cdks'">
           <section class="panel settings-panel">
-            <div class="section-heading"><h2>生成兑换码</h2><a class="text-button" href="/join" target="_blank" rel="noopener">兑换入口 ↗</a></div>
+            <div class="section-heading"><h2>生成兑换码</h2><a class="text-button" :href="joinUrl" target="_blank" rel="noopener">兑换入口 ↗</a></div>
             <form class="cdk-fields" @submit.prevent="createCDKs">
               <label>数量<input v-model.number="cdkForm.count" type="number" min="1" max="200" required /></label>
               <label>批次备注<input v-model="cdkForm.label" maxlength="120" placeholder="例如：首批体验用户" /></label>

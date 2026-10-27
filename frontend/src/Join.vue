@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from "vue";
 import logoUrl from "./assets/teammanager.png";
+import { apiBase } from "./paths";
 const email = ref(""), code = ref(""), busy = ref(false), error = ref("");
 const available = ref<number | null>(null), capacityBusy = ref(false), capacityError = ref("");
 async function refreshCapacity() {
   capacityBusy.value = true; capacityError.value = "";
   try {
-    const response = await fetch("/api/public/availability", { credentials: "omit", cache: "no-store" });
+    const response = await fetch(apiBase + "/public/availability", { credentials: "omit", cache: "no-store" });
     if (!response.ok) throw new Error("席位数据暂不可用");
     available.value = (await response.json()).available;
   } catch { available.value = null; capacityError.value = "席位数据暂不可用"; }
@@ -32,7 +33,7 @@ function followResult() {
 }
 onUnmounted(() => { disposed = true; clearTimeout(statusTimer); });
 async function send(path: string, body: unknown) {
-  const response = await fetch("/api/public/" + path, {
+  const response = await fetch(apiBase + "/public/" + path, {
     method: "POST", headers: { "Content-Type": "application/json", "X-TeamManager": "1" },
     body: JSON.stringify(body), credentials: "omit",
   });

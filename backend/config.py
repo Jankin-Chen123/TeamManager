@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     admin_password: SecretStr
     database_url: str = "sqlite:///data/teammanager.db"
     cookie_secure: bool = False
+    cookie_path: str = "/"
     request_timeout: float = Field(20, ge=1, le=120)
     concurrency: int = Field(4, ge=1, le=16)
     session_hours: int = Field(12, ge=1, le=168)

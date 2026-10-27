@@ -1,0 +1,30 @@
+# Add inside the existing aibaipiao.top server block. Keep its / location.
+location = /TeamManager {
+    return 308 https://$host/TeamManager/$is_args$args;
+}
+
+location = /JoinTeam/ {
+    return 308 https://$host/JoinTeam$is_args$args;
+}
+
+location = /JoinTeam {
+    if ($scheme = http) { return 308 https://$host$request_uri; }
+    proxy_pass http://127.0.0.1:8765/join;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_read_timeout 180s;
+    proxy_cache off;
+}
+
+location ^~ /TeamManager/ {
+    if ($scheme = http) { return 308 https://$host$request_uri; }
+    # Trailing slash strips /TeamManager/ before reaching FastAPI.
+    proxy_pass http://127.0.0.1:8765/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    client_max_body_size 512k;
+    proxy_read_timeout 180s;
+    proxy_cache off;
+}

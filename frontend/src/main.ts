@@ -3,4 +3,4 @@ import App from "./App.vue";
 import Join from "./Join.vue";
 import "./style.css";
 import "./theme.css";
-createApp(location.pathname.replace(/\/$/, "") === "/join" ? Join : App).mount("#app");
+createApp(["/join", "/JoinTeam"].includes(location.pathname.replace(/\/$/, "")) ? Join : App).mount("#app");
