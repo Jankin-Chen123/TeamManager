@@ -1,0 +1,1265 @@
+{
+  "source": "https://chatgpt.com/admin/api-reference",
+  "downloaded_date": "2026-10-27",
+  "source_sha256": "eb6528ee50cdfeb4fc8846561776e4627f5c7462064d261f87238850e3a760d1",
+  "servers": [
+    {
+      "url": "https://api.chatgpt.com/v1"
+    }
+  ],
+  "paths": {
+    "/manage/workspaces/{workspace_id}/invites": {
+      "get": {
+        "summary": "List Workspace Invitations",
+        "description": "Lists non-deleted workspace invitations in stable ID order. By default, the\nresponse includes pending, expired, and accepted invitations.\nAccepted records are returned only when they can be attributed to an invitation;\nhistorical accepted records without that attribution are not returned. Set status\nto return one lifecycle state.\n\nThis list reads from an indexed store and is eventually consistent; it does\nnot guarantee immediate read-your-write. Use the create response or direct\ninvitation GET when an immediate result is required.\n",
+        "tags": [
+          "Workspace Invitations"
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The ID of the workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_id"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Invitation ID after which to fetch the next page.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum invitations to return. The default is 20 and the maximum is 1000.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 20
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Optional lifecycle state filter.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "expired",
+                "accepted"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ManagedWorkspaceInviteListResponse"
+          },
+          "400": {
+            "description": "Invalid status, cursor, or limit."
+          },
+          "401": {
+            "description": "Missing or invalid Admin API key."
+          },
+          "403": {
+            "description": "Admin API key lacks the required Invitations scope or workspace access."
+          },
+          "404": {
+            "description": "The workspace was not found or this feature is unavailable."
+          },
+          "429": {
+            "description": "Too many requests. The endpoint quota, an operation protection, or a downstream limit was exceeded. Follow Retry-After when provided."
+          }
+        },
+        "security": [
+          {
+            "chatgpt.enterprise.invite": [
+              "read"
+            ]
+          }
+        ]
+      },
+      "post": {
+        "summary": "Create Workspace Invitation",
+        "description": "Creates a manual workspace invitation. The requested built-in membership role\nis assigned after acceptance. Omit seat_type or set it to null to use the\nworkspace default. Elevated roles require a workspace owner.\n",
+        "tags": [
+          "Workspace Invitations"
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The ID of the workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateManagedWorkspaceInviteRequest"
+              },
+              "example": {
+                "email": "new.user@example.com",
+                "role": "member",
+                "seat_type": "chatgpt"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/ManagedWorkspaceInviteResponse"
+          },
+          "400": {
+            "description": "Invalid email, role, seat type, request shape, duplicate invitation, existing member, or workspace rule."
+          },
+          "401": {
+            "description": "Missing or invalid Admin API key."
+          },
+          "403": {
+            "description": "Admin API key lacks the required Invitations scope or workspace access, or the actor cannot assign the requested role."
+          },
+          "404": {
+            "description": "The workspace was not found or this feature is unavailable."
+          },
+          "429": {
+            "description": "Too many requests. The endpoint quota, an operation protection, or a downstream limit was exceeded. Follow Retry-After when provided."
+          }
+        },
+        "security": [
+          {
+            "chatgpt.enterprise.invite": [
+              "write"
+            ]
+          }
+        ]
+      }
+    },
+    "/manage/workspaces/{workspace_id}/invites/{invite_id}": {
+      "get": {
+        "summary": "Get Workspace Invitation",
+        "description": "Retrieves a pending, expired, or accepted invitation by ID. Accepted records\nare returned only when they can be attributed to an invitation; historical\naccepted records without that attribution are not returned.\n",
+        "tags": [
+          "Workspace Invitations"
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The ID of the workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_id"
+            }
+          },
+          {
+            "name": "invite_id",
+            "in": "path",
+            "description": "The invitation ID.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ManagedWorkspaceInviteResponse"
+          },
+          "401": {
+            "description": "Missing or invalid Admin API key."
+          },
+          "403": {
+            "description": "Admin API key lacks the required Invitations scope or workspace access."
+          },
+          "404": {
+            "description": "The workspace or invitation was not found, or this feature is unavailable."
+          },
+          "429": {
+            "description": "Too many requests. The endpoint quota, an operation protection, or a downstream limit was exceeded. Follow Retry-After when provided."
+          }
+        },
+        "security": [
+          {
+            "chatgpt.enterprise.invite": [
+              "read"
+            ]
+          }
+        ]
+      },
+      "delete": {
+        "summary": "Delete Workspace Invitation",
+        "description": "Deletes a pending manual invitation before it is accepted. SCIM-managed\ninvitations must be managed through the identity provider.\n",
+        "tags": [
+          "Workspace Invitations"
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The ID of the workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_id"
+            }
+          },
+          {
+            "name": "invite_id",
+            "in": "path",
+            "description": "The invitation ID.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ManagedWorkspaceInviteDeletedResponse"
+          },
+          "401": {
+            "description": "Missing or invalid Admin API key."
+          },
+          "403": {
+            "description": "Admin API key lacks the required Invitations scope or workspace access."
+          },
+          "404": {
+            "description": "The workspace or pending invitation was not found, or this feature is unavailable."
+          },
+          "409": {
+            "description": "The invitation is SCIM-managed and must be changed through the identity provider."
+          },
+          "429": {
+            "description": "Too many requests. The endpoint quota, an operation protection, or a downstream limit was exceeded. Follow Retry-After when provided."
+          }
+        },
+        "security": [
+          {
+            "chatgpt.enterprise.invite": [
+              "write"
+            ]
+          }
+        ]
+      }
+    },
+    "/manage/workspaces/{workspace_id}/invites/{invite_id}/resend": {
+      "post": {
+        "summary": "Resend Workspace Invitation",
+        "description": "Resends a pending manual invitation email and returns the invitation with\nits updated last_sent_at. SCIM-managed invitations must be managed through\nthe identity provider.\n",
+        "tags": [
+          "Workspace Invitations"
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The ID of the workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_id"
+            }
+          },
+          {
+            "name": "invite_id",
+            "in": "path",
+            "description": "The invitation ID.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ManagedWorkspaceInviteResponse"
+          },
+          "401": {
+            "description": "Missing or invalid Admin API key."
+          },
+          "403": {
+            "description": "Admin API key lacks the required Invitations scope or workspace access."
+          },
+          "404": {
+            "description": "The workspace or pending invitation was not found, or this feature is unavailable."
+          },
+          "409": {
+            "description": "The invitation is SCIM-managed and must be changed through the identity provider."
+          },
+          "429": {
+            "description": "Too many requests. The endpoint quota, an operation protection, or a downstream limit was exceeded. Follow Retry-After when provided."
+          }
+        },
+        "security": [
+          {
+            "chatgpt.enterprise.invite": [
+              "write"
+            ]
+          }
+        ]
+      }
+    },
+    "/manage/workspaces/{workspace_id}/users": {
+      "get": {
+        "summary": "List Workspace Users",
+        "description": "Lists current active workspace members in ascending user ID order. Removed\nand inactive members, along with service accounts, are excluded. Each result\nuses the same `workspace.user` resource and built-in workspace roles as\nGet Workspace User.\n\nPass `email` to resolve an exact email address to a user ID without paging\nthrough the workspace. The response keeps the same list envelope with\nzero or one member and `has_more: false`. An unknown email or a user who\nis not an active member of this workspace returns an empty list, not a 404.\n\nThis list reads from an indexed store and is eventually consistent; it does\nnot guarantee immediate read-your-write after membership or profile changes.\nA newly added member may be absent until the index updates. Without `email`,\na removed or inactive member may briefly remain visible as well.\n\nUse this endpoint when managing current workspace members. The separate\nCompliance Users LIST endpoint retains its historical export behavior and\nlegacy response shape.\n",
+        "tags": [
+          "Workspace Users"
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The ID of the workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_id"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "User ID after which to fetch the next page of active members. Cannot be combined with email.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum active members to return. The default is 20 and the maximum is 1000. With email, this limit is still validated, but at most one member is returned.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 20
+            }
+          },
+          {
+            "name": "email",
+            "in": "query",
+            "description": "Exact email address to look up in this workspace, normalized by trimming\nsurrounding whitespace and lowercasing. Partial and prefix matches are\nnot supported. Cannot be combined with `after`, including an empty cursor.\nURL-encode the address when constructing the query string; for example,\n`?email=alex%2Bqa%40example.com` looks up `alex+qa@example.com`.\n",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "alex+qa@example.com"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ManagedWorkspaceUserListResponse"
+          },
+          "400": {
+            "description": "The email, pagination cursor, or limit is invalid. An empty or malformed\nemail returns `invalid_email`; combining email with `after` returns\n`invalid_cursor`.\n"
+          },
+          "401": {
+            "description": "Missing or invalid Admin API key."
+          },
+          "403": {
+            "description": "Admin API key lacks the required Users scope or workspace access."
+          },
+          "404": {
+            "description": "The workspace or cursor member was not found, or this feature is unavailable."
+          },
+          "429": {
+            "description": "Too many requests. The endpoint quota, an operation protection, or a downstream limit was exceeded. Follow Retry-After when provided."
+          }
+        },
+        "security": [
+          {
+            "chatgpt.enterprise.user": [
+              "read"
+            ]
+          }
+        ]
+      }
+    },
+    "/manage/workspaces/{workspace_id}/users/{user_id}": {
+      "get": {
+        "summary": "Get Workspace User",
+        "description": "Retrieves one accepted workspace member. With the Users read permission,\nthe member resource includes name and email.\n",
+        "tags": [
+          "Workspace Users"
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The ID of the workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "The auth user ID of the accepted workspace member.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/user_id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ManagedWorkspaceUserResponse"
+          },
+          "401": {
+            "description": "Missing or invalid Admin API key."
+          },
+          "403": {
+            "description": "Admin API key lacks the required Users scope or workspace access."
+          },
+          "404": {
+            "description": "The workspace or member was not found, or this feature is unavailable."
+          },
+          "429": {
+            "description": "Too many requests. The endpoint quota, an operation protection, or a downstream limit was exceeded. Follow Retry-After when provided."
+          }
+        },
+        "security": [
+          {
+            "chatgpt.enterprise.user": [
+              "read"
+            ]
+          }
+        ]
+      },
+      "post": {
+        "summary": "Update Workspace User",
+        "description": "Updates an accepted member's built-in workspace role, product seat, or both.\nOnly workspace owners may update members. SCIM-managed members may receive\nrole or seat updates when the same change is allowed in Workspace Settings.\nThe API rejects empty bodies, null values, unknown fields, unsupported\ncombinations, and changes that would remove the last owner.\n",
+        "tags": [
+          "Workspace Users"
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The ID of the workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "The auth user ID of the accepted workspace member.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/user_id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateManagedWorkspaceUserRequest"
+              },
+              "examples": {
+                "role": {
+                  "summary": "Update a built-in membership role",
+                  "value": {
+                    "role": "admin"
+                  }
+                },
+                "seat": {
+                  "summary": "Update a product seat",
+                  "value": {
+                    "seat_type": "codex"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ManagedWorkspaceUserResponse"
+          },
+          "400": {
+            "description": "Invalid request shape, role, seat type, combination, or workspace rule."
+          },
+          "401": {
+            "description": "Missing or invalid Admin API key."
+          },
+          "403": {
+            "description": "Admin API key lacks the required Users scope or workspace access, or the actor is not a workspace owner."
+          },
+          "404": {
+            "description": "The workspace or member was not found, or this feature is unavailable."
+          },
+          "409": {
+            "description": "The update conflicts with current workspace or seat state."
+          },
+          "422": {
+            "description": "The update would remove the last workspace owner."
+          },
+          "429": {
+            "description": "Too many requests. The endpoint quota, an operation protection, or a downstream limit was exceeded. Follow Retry-After when provided."
+          },
+          "503": {
+            "description": "Seat subscription or provisioning is temporarily unavailable."
+          }
+        },
+        "security": [
+          {
+            "chatgpt.enterprise.user": [
+              "write"
+            ]
+          }
+        ]
+      },
+      "delete": {
+        "summary": "Delete Workspace User",
+        "description": "Removes accepted workspace membership without deleting the global user or\nworkspace data. With a Users write Admin API key, workspace owners may remove\nmembers, admins, and owners; workspace admins may remove only lower-role\nmembers. A caller may remove their own membership through the self-leave flow,\nexcept when they are the last owner. The last owner cannot be removed.\nSCIM-managed members must be removed through the identity provider.\n",
+        "tags": [
+          "Workspace Users"
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The ID of the workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "The auth user ID of the accepted workspace member.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/user_id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/ManagedWorkspaceUserDeletedResponse"
+          },
+          "401": {
+            "description": "Missing or invalid Admin API key."
+          },
+          "403": {
+            "description": "Admin API key lacks the required Users scope or workspace access, or the actor cannot remove the target member."
+          },
+          "404": {
+            "description": "The workspace or member was not found, or this feature is unavailable."
+          },
+          "409": {
+            "description": "The member is SCIM-managed and must be removed through the identity provider."
+          },
+          "422": {
+            "description": "The deletion would remove the last workspace owner."
+          },
+          "429": {
+            "description": "Too many requests. The endpoint quota, an operation protection, or a downstream limit was exceeded. Follow Retry-After when provided."
+          }
+        },
+        "security": [
+          {
+            "chatgpt.enterprise.user": [
+              "write"
+            ]
+          }
+        ]
+      }
+    },
+    "/manage/workspaces/{workspace_id}/groups/{group_id}/users": {
+      "get": {
+        "summary": "List Group Users",
+        "description": "Lists users assigned to a workspace group.\n\nResults are ordered by membership creation time. Use the returned `cursor` value to fetch\nthe next page with the same `order`.\n",
+        "tags": [
+          "Group management",
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The ID of the workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_id"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "description": "The ID of the workspace group.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "The maximum number of users to list. The default is 20 and the maximum is 100.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Opaque cursor returned by a previous response.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "Membership creation-time sort order. Cursors are opaque and stable for this ordering.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "asc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/WorkspaceDirectoryUserListResponse"
+          },
+          "400": {
+            "description": "Invalid cursor, limit, or request input."
+          },
+          "401": {
+            "description": "Missing or invalid admin API key."
+          },
+          "403": {
+            "description": "Admin API key does not have the required group management scope or is not authorized for the workspace."
+          },
+          "404": {
+            "description": "The workspace or group was not found."
+          },
+          "429": {
+            "description": "Too many requests. The endpoint quota, an operation protection, or a downstream limit was exceeded. Follow Retry-After when provided."
+          }
+        },
+        "security": [
+          {
+            "chatgpt.enterprise.directory": [
+              "read"
+            ]
+          }
+        ]
+      },
+      "post": {
+        "summary": "Add Group User",
+        "description": "Adds a workspace user to a manually managed workspace group.\nFor up to 100 users, use `POST /manage/workspaces/{workspace_id}/groups/{group_id}/users/bulk`.\n\nThis endpoint changes ChatGPT-managed group membership only. If the group is\nSCIM-managed, update membership in your identity provider instead; the request\nreturns `409` with code `scim_managed_resource`.\n",
+        "tags": [
+          "Group management",
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The ID of the workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_id"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "description": "The ID of the workspace group.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddWorkspaceDirectoryGroupUserRequest"
+              },
+              "example": {
+                "user_id": "user_abc"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/WorkspaceDirectoryGroupUserResponse"
+          },
+          "400": {
+            "description": "Invalid request input."
+          },
+          "401": {
+            "description": "Missing or invalid admin API key."
+          },
+          "403": {
+            "description": "Admin API key does not have the required group management scope or is not authorized for the workspace."
+          },
+          "404": {
+            "description": "The workspace, user, or group was not found."
+          },
+          "409": {
+            "description": "The membership change conflicts with the current directory state, such as a SCIM-managed group or restricted safe mode policy conflict."
+          },
+          "429": {
+            "description": "Too many requests. The endpoint quota, an operation protection, or a downstream limit was exceeded. Follow Retry-After when provided."
+          }
+        },
+        "security": [
+          {
+            "chatgpt.enterprise.directory": [
+              "write"
+            ]
+          }
+        ]
+      },
+      "delete": {
+        "summary": "Bulk Remove Group Users",
+        "description": "Synchronously processes 1–100 distinct users of one manually managed group. The admin\nAPI key must have `chatgpt.enterprise.directory.write` and access to the workspace's\norganization. SCIM-managed groups must be changed through SCIM; their per-user results\nare 409 `scim_managed_resource`. Existing authorization, eligibility, restricted-safe-mode,\nmanager-revocation ordering, and required access-control side effects are preserved.\n\nEmpty, duplicate, malformed and over-100 batches return 400 before user work. Independent\nusers run with at most five concurrent operations per request. At most two bulk group\nrequests are admitted simultaneously per serving process; additional requests return\nHTTP 429 with Retry-After before writes. Each HTTP batch consumes one shared\nworkspace API quota unit.\n\nThe batch is not atomic. HTTP 200 returns an array in input order, including every user,\neven if every operation fails. A failed or missing user does not discard peer results.\nThe handler stops admitting users after at most 25 seconds, or one second before its\nconfigured server HTTP deadline, whichever is earlier. Started operations are canceled\nand joined; unstarted users return `not_attempted`. Cancellation cleanup can consume\nthe reserve. A shorter upstream/client timeout can still prevent the whole response.\n\nA started write whose response or side effect failed is `unknown`, not proof of no change.\nNever automatically retry an unknown write or a batch with a lost whole response.\nReconcile membership, group-manager assignment and required access-control invalidations\nbefore issuing new intent; checking only the membership edge is insufficient. `failed`\nbefore a write and `not_attempted` may be retried when `retryable` is true, respecting\nRetry-After. Successful membership does not guarantee search-index freshness. These\nresults are not an atomic snapshot and concurrent administrators can make later changes.\n\nSplit a 1,000-user operation into ten requests of at most 100 distinct IDs. Keep a durable\nledger keyed by submitted ID, begin with one request in flight, and preserve every result.\nDo not replay complete batches to recover individual failures. The 100-user limit is a\nrequest-size limit, not a production latency or throughput guarantee.\n\nExample: `DELETE /v1/manage/workspaces/{workspace_id}/groups/{group_id}/users`\nwith JSON `{\"user_ids\":[\"user-AAA\",\"user-BBB\"]}`.\n",
+        "tags": [
+          "Group management",
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_id"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkWorkspaceDirectoryGroupUsersRequest"
+              },
+              "example": {
+                "user_ids": [
+                  "user-AAA",
+                  "user-BBB"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Complete ordered per-user results; partial and all-failure batches also return HTTP 200.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BulkWorkspaceDirectoryGroupUserResult"
+                  }
+                },
+                "examples": {
+                  "partialFailure": {
+                    "value": [
+                      {
+                        "object": "directory.workspace.group_user.result",
+                        "id": "user-AAA",
+                        "outcome": "no_change",
+                        "status_code": 200,
+                        "resource": {
+                          "object": "directory.workspace.group_user.deleted",
+                          "workspace_id": "00000000-0000-4000-8000-000000000001",
+                          "group_id": "group-example",
+                          "user_id": "user-AAA"
+                        },
+                        "code": null,
+                        "message": null,
+                        "retry_after": null,
+                        "retryable": false
+                      },
+                      {
+                        "object": "directory.workspace.group_user.result",
+                        "id": "user-BBB",
+                        "outcome": "unknown",
+                        "status_code": 504,
+                        "resource": null,
+                        "code": "batch_deadline_exceeded",
+                        "message": "Reconcile membership and required access-control side effects before new write intent.",
+                        "retry_after": null,
+                        "retryable": false
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing, empty, duplicate, malformed or oversized user_ids; no user work started."
+          },
+          "401": {
+            "description": "Missing or invalid admin API key; no user work started."
+          },
+          "403": {
+            "description": "Missing directory-write scope or workspace/organization access; no user work started."
+          },
+          "404": {
+            "description": "Workspace not found; no user work started."
+          },
+          "429": {
+            "description": "Existing request quota or concurrent bulk admission exceeded; no user work started."
+          }
+        },
+        "security": [
+          {
+            "chatgpt.enterprise.directory": [
+              "write"
+            ]
+          }
+        ]
+      }
+    },
+    "/manage/workspaces/{workspace_id}/groups/{group_id}/users/{user_id}": {
+      "delete": {
+        "summary": "Remove Group User",
+        "description": "Removes a workspace user from a manually managed workspace group.\nFor up to 100 users, use `DELETE /manage/workspaces/{workspace_id}/groups/{group_id}/users` with a JSON user_ids body.\n\nThis endpoint changes ChatGPT-managed group membership only. If the group is\nSCIM-managed, update membership in your identity provider instead; the request\nreturns `409` with code `scim_managed_resource`.\n",
+        "tags": [
+          "Group management",
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The ID of the workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/workspace_id"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "description": "The ID of the workspace group.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "The ID of the workspace user to remove.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/user_id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/WorkspaceDirectoryGroupUserDeletedResponse"
+          },
+          "400": {
+            "description": "Invalid request input."
+          },
+          "401": {
+            "description": "Missing or invalid admin API key."
+          },
+          "403": {
+            "description": "Admin API key does not have the required group management scope or is not authorized for the workspace."
+          },
+          "404": {
+            "description": "The workspace, user, or group was not found."
+          },
+          "409": {
+            "description": "The membership change conflicts with the current directory state, such as a SCIM-managed group."
+          },
+          "429": {
+            "description": "Too many requests. The endpoint quota, an operation protection, or a downstream limit was exceeded. Follow Retry-After when provided."
+          }
+        },
+        "security": [
+          {
+            "chatgpt.enterprise.directory": [
+              "write"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "schemas": {
+    "ManagedWorkspaceInvite": {
+      "type": "object",
+      "description": "A workspace invitation managed through the Workspace Invitations Admin API.",
+      "required": [
+        "object",
+        "id",
+        "email",
+        "role",
+        "status",
+        "created_at",
+        "last_sent_at",
+        "seat_type",
+        "is_scim_managed"
+      ],
+      "properties": {
+        "object": {
+          "type": "string",
+          "enum": [
+            "workspace.invite"
+          ],
+          "description": "The resource type."
+        },
+        "id": {
+          "type": "string",
+          "description": "The stable invitation ID."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The normalized email address for the invitation."
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "member",
+            "admin",
+            "owner",
+            "analytics_viewer"
+          ],
+          "description": "The built-in workspace membership role assigned when the invitation is accepted."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "expired",
+            "accepted"
+          ],
+          "description": "The invitation lifecycle state."
+        },
+        "created_at": {
+          "type": "integer",
+          "format": "int64",
+          "description": "Unix timestamp in seconds when the invitation was created."
+        },
+        "last_sent_at": {
+          "type": "integer",
+          "format": "int64",
+          "nullable": true,
+          "description": "Unix timestamp in seconds when the invitation email was last sent, or null if unavailable."
+        },
+        "seat_type": {
+          "type": "string",
+          "enum": [
+            "chatgpt",
+            "codex"
+          ],
+          "description": "The product seat assigned when the invitation is accepted."
+        },
+        "is_scim_managed": {
+          "type": "boolean",
+          "description": "Whether the invitation is managed through SCIM."
+        }
+      }
+    },
+    "ManagedWorkspaceInviteList": {
+      "type": "object",
+      "required": [
+        "object",
+        "data",
+        "first_id",
+        "last_id",
+        "has_more"
+      ],
+      "properties": {
+        "object": {
+          "type": "string",
+          "enum": [
+            "list"
+          ],
+          "description": "The response envelope type."
+        },
+        "data": {
+          "type": "array",
+          "description": "Workspace invitations in stable cursor order.",
+          "items": {
+            "$ref": "#/components/schemas/ManagedWorkspaceInvite"
+          }
+        },
+        "first_id": {
+          "type": "string",
+          "nullable": true,
+          "description": "The first invitation ID in this page."
+        },
+        "last_id": {
+          "type": "string",
+          "nullable": true,
+          "description": "The last invitation ID in this page."
+        },
+        "has_more": {
+          "type": "boolean",
+          "description": "Whether another page is available."
+        }
+      }
+    },
+    "CreateManagedWorkspaceInviteRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "email",
+        "role"
+      ],
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Email address of the person to invite."
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "member",
+            "admin",
+            "owner",
+            "analytics_viewer"
+          ],
+          "description": "Built-in workspace membership role to assign after acceptance."
+        },
+        "seat_type": {
+          "type": "string",
+          "enum": [
+            "chatgpt",
+            "codex"
+          ],
+          "nullable": true,
+          "description": "Product seat to assign after acceptance. Omit or set null to use the workspace default."
+        }
+      }
+    },
+    "ManagedWorkspaceInviteDeleted": {
+      "type": "object",
+      "required": [
+        "object",
+        "id",
+        "deleted"
+      ],
+      "properties": {
+        "object": {
+          "type": "string",
+          "enum": [
+            "workspace.invite.deleted"
+          ],
+          "description": "The resource type."
+        },
+        "id": {
+          "type": "string",
+          "description": "The deleted invitation ID."
+        },
+        "deleted": {
+          "type": "boolean",
+          "enum": [
+            true
+          ],
+          "description": "Always true."
+        }
+      }
+    },
+    "ManagedWorkspaceUser": {
+      "type": "object",
+      "description": "An accepted member of a ChatGPT workspace.",
+      "required": [
+        "object",
+        "id",
+        "email",
+        "name",
+        "role",
+        "seat_type",
+        "is_scim_managed"
+      ],
+      "properties": {
+        "object": {
+          "type": "string",
+          "enum": [
+            "workspace.user"
+          ],
+          "description": "The resource type."
+        },
+        "id": {
+          "$ref": "#/components/schemas/user_id"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "nullable": true,
+          "description": "The member email address."
+        },
+        "name": {
+          "type": "string",
+          "nullable": true,
+          "description": "The member display name."
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "member",
+            "admin",
+            "owner",
+            "analytics_viewer"
+          ],
+          "description": "The built-in workspace membership role."
+        },
+        "seat_type": {
+          "type": "string",
+          "enum": [
+            "chatgpt",
+            "codex"
+          ],
+          "description": "The member product seat."
+        },
+        "is_scim_managed": {
+          "type": "boolean",
+          "description": "Whether the member is managed through SCIM."
+        }
+      }
+    },
+    "ManagedWorkspaceUserList": {
+      "type": "object",
+      "required": [
+        "object",
+        "data",
+        "first_id",
+        "last_id",
+        "has_more"
+      ],
+      "properties": {
+        "object": {
+          "type": "string",
+          "enum": [
+            "list"
+          ],
+          "description": "The response envelope type."
+        },
+        "data": {
+          "type": "array",
+          "description": "Active workspace members in stable user ID order, excluding service accounts.",
+          "items": {
+            "$ref": "#/components/schemas/ManagedWorkspaceUser"
+          }
+        },
+        "first_id": {
+          "type": "string",
+          "nullable": true,
+          "description": "The first user ID in this page."
+        },
+        "last_id": {
+          "type": "string",
+          "nullable": true,
+          "description": "The last user ID in this page."
+        },
+        "has_more": {
+          "type": "boolean",
+          "description": "Whether another page of active workspace members is available."
+        }
+      }
+    },
+    "UpdateManagedWorkspaceUserRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": [
+            "member",
+            "admin",
+            "owner",
+            "analytics_viewer"
+          ],
+          "description": "New built-in workspace membership role."
+        },
+        "seat_type": {
+          "type": "string",
+          "enum": [
+            "chatgpt",
+            "codex"
+          ],
+          "description": "New product seat."
+        }
+      }
+    },
+    "ManagedWorkspaceUserDeleted": {
+      "type": "object",
+      "required": [
+        "object",
+        "id",
+        "deleted"
+      ],
+      "properties": {
+        "object": {
+          "type": "string",
+          "enum": [
+            "workspace.user.deleted"
+          ],
+          "description": "The resource type."
+        },
+        "id": {
+          "$ref": "#/components/schemas/user_id"
+        },
+        "deleted": {
+          "type": "boolean",
+          "enum": [
+            true
+          ],
+          "description": "Always true."
+        }
+      }
+    }
+  }
+}

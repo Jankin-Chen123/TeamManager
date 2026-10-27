@@ -1,0 +1,105 @@
+name: Test and publish
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements-dev.lock
+      - run: ruff check backend scripts tests migrations
+      - run: pytest -q
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci && npm run build
+        working-directory: frontend
+      - run: docker build -t teammanager:ci .
+      - name: Container startup and persistence
+        run: |
+          python scripts/init_config.py
+          mkdir -p test-results
+          python - <<'PY'
+          from pathlib import Path
+          from dotenv import dotenv_values
+          v = dotenv_values('.env')
+          Path('test-results/container.env').write_text('\n'.join(k+'='+v[k] for k in ['TM_MASTER_KEY','TM_ADMIN_PASSWORD'])+'\nTM_REQUEST_TIMEOUT=1\n')
+          PY
+          docker volume create tm-ci-data
+          docker run -d --name tm-ci --env-file test-results/container.env -v tm-ci-data:/app/data -p 127.0.0.1:8765:8765 teammanager:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8765/api/health; then break; fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:8765/api/health
+          python scripts/container_smoke.py seed
+          docker stop tm-ci
+          docker rm tm-ci
+          docker run -d --name tm-ci --env-file test-results/container.env -v tm-ci-data:/app/data -p 127.0.0.1:8765:8765 teammanager:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8765/api/health; then break; fi
+            sleep 2
+          done
+          python scripts/container_smoke.py verify
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs tm-ci || true
+  publish:
+    if: github.event_name == 'push'
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=sha
+            type=ref,event=tag
+            type=raw,value=latest,enable={{is_default_branch}}
+      - id: image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: true
+          sbom: true
+      - name: Publish deployment summary
+        env:
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import os
+          print('## TeamManager 镜像发布')
+          print('\n```text\n' + os.environ['IMAGE_TAGS'] + '\n```')
+          print('\n镜像摘要：`' + os.environ['IMAGE_DIGEST'] + '`')
+          print('\n更新前备份数据库及主密钥；运行 `sh scripts/update.sh <版本镜像或摘要>`。')
+          print('\n更新与回退步骤见仓库 `docs/DEPLOYMENT.md`；真实空间验证单独执行。')
+          PY
