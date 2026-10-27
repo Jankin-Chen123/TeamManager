@@ -29,7 +29,24 @@
 
 主密钥、数据库和备份必须持久保存。不要删除 Compose 命名卷。升级使用现有备份流程；健康检查失败不会自动降级数据库，按 `DEPLOYMENT.md` 恢复。
 
-## 后续自动部署（可选）
+## 后续自动部署：服务器主动拉取
+
+服务器运行 `teammanager-update.timer`，每 5 分钟检查此仓库 `ci.yml` 在 main 分支最近一次成功的 push。只有整个工作流成功后才拉取镜像，并核实镜像的完整提交 SHA。使用镜像摘要更新，升级前备份，保持单实例。
+
+首次安装：把 `scripts/pull_deploy.py` 放到 `/opt/teammanager/scripts`，将两个 `deploy/teammanager-update.*` 文件复制到 `/etc/systemd/system/`。在 `/opt/teammanager/.deployment/revision` 写入当前已部署镜像的完整提交 SHA，然后执行：
+
+```sh
+systemctl daemon-reload
+systemctl enable --now teammanager-update.timer
+```
+
+查看状态：`systemctl list-timers teammanager-update.timer`；查看更新日志：`journalctl -u teammanager-update.service`。立即检查并更新：`systemctl start teammanager-update.service`。停止自动更新：`systemctl disable --now teammanager-update.timer`。
+
+每次从已通过检查的相同提交取得部署脚本和 Compose 文件。工作流失败时保留现有服务；部署执行失败时，`.deployment/attempt` 会阻止重复执行该版本，需管理员检查日志、按部署文档恢复后再删除该标记。应用健康检查失败不自动降级数据库。当前方式要求仓库源码、Actions 记录和镜像可公开读取；变成私有仓库前需调整认证。
+
+## 可选替代：GitHub 主动通过 Tailscale 部署
+
+两种自动部署方式只启用一种，避免同时更新同一实例。当前服务器主动拉取方案不需要以下凭据。
 
 工作流中的 `deploy` 默认关闭；人工部署不需要 Tailscale OAuth。开启后，流程为：检查 → GHCR 发布 → GitHub 临时设备加入 Tailnet → 私网 SSH → **服务器拉取本次镜像摘要** → 备份、更新及健康检查。只有 main 分支触发部署，版本标签只发布镜像。
 

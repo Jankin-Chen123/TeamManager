@@ -1,0 +1,12 @@
+[Unit]
+Description=Check verified TeamManager releases every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+RandomizedDelaySec=20
+Persistent=true
+Unit=teammanager-update.service
+
+[Install]
+WantedBy=timers.target

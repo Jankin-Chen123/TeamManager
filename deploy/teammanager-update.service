@@ -1,0 +1,12 @@
+[Unit]
+Description=Pull verified TeamManager container from GitHub
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/teammanager
+ExecStart=/usr/bin/python3 /opt/teammanager/scripts/pull_deploy.py
+TimeoutStartSec=900
+UMask=0077

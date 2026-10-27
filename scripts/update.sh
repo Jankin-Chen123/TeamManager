@@ -20,7 +20,12 @@ docker inspect --format '{{.Image}}' "$(docker compose ps -q app)" > "backups/pr
 cp .env "backups/env-$stamp"
 chmod 600 "backups/env-$stamp"
 docker compose stop app
-docker compose run --rm --no-deps app python -c 'import sqlite3,datetime; p="/app/backups/teammanager-"+datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")+".db"; s=sqlite3.connect("file:/app/data/teammanager.db?mode=ro",uri=True); d=sqlite3.connect(p); s.backup(d); assert d.execute("PRAGMA integrity_check").fetchone()[0]=="ok"; d.close(); s.close(); print(p)'
+if ! docker compose run --rm --no-deps app python -c 'import sqlite3,datetime; p="/app/backups/teammanager-"+datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")+".db"; s=sqlite3.connect("file:/app/data/teammanager.db?mode=ro",uri=True); d=sqlite3.connect(p); s.backup(d); assert d.execute("PRAGMA integrity_check").fetchone()[0]=="ok"; d.close(); s.close(); print(p)'; then
+  # The old container is still intact: no new application has touched the database.
+  docker compose start app
+  echo "Backup failed; old container restarted. Update aborted." >&2
+  exit 1
+fi
 docker compose up -d --no-build app
 count=0
 until docker compose exec -T app python -c 'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8765/api/health",timeout=3)' >/dev/null 2>&1; do
