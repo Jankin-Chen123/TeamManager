@@ -5,6 +5,7 @@ from sqlalchemy import select, func
 
 from backend.models import Workspace, Node, Redemption, SeatReservation, now
 from backend.upstream import GatewayResult, UpstreamError
+from backend.seats import IDLE_SNAPSHOT_TTL
 from tests.conftest import login, seed
 from tests.test_management import wait_job
 
@@ -241,3 +242,110 @@ async def test_invitation_jobs_are_global_serial_across_workspaces(installation,
     await wait_job(client, first.json()["job_id"])
     await wait_job(client, last.json()["job_id"])
     assert peak == 1 and set(calls) == {space["id"], second["id"]}
+
+
+async def test_idle_snapshots_refresh_only_when_due(installation, monkeypatch):
+    app, client, node, space = await setup(installation)
+    snapshot(app, space["id"])
+    services = app.state.services
+    calls = []
+
+    async def page(*args, **kwargs):
+        calls.append(args[3])
+        return GatewayResult({"data": [], "has_more": False})
+
+    monkeypatch.setattr(services.gateway, "_workspace", page)
+    with app.state.db.begin() as db:
+        db.get(Workspace, space["id"]).seat_checked_at = now() - 600
+    services.seats.tick()
+    assert not calls and not services.seats.pending
+    with app.state.db.begin() as db:
+        db.get(Workspace, space["id"]).seat_checked_at = now() - IDLE_SNAPSHOT_TTL - 1
+    services.seats.tick()
+    services.seats.tick()
+    await asyncio.gather(*list(services.tasks))
+    assert calls == ["users", "invites"]
+
+
+async def test_public_capacity_is_cached_and_rate_limited(installation, monkeypatch):
+    app, client, node, space = await setup(installation)
+    snapshot(app, space["id"])
+    services = app.state.services
+    summaries = []
+    original = services.seats.summary
+
+    def summary():
+        summaries.append(1)
+        return original()
+
+    async def unexpected(*args, **kwargs):
+        pytest.fail("Public capacity must never contact upstream")
+
+    monkeypatch.setattr(services.seats, "summary", summary)
+    monkeypatch.setattr(services.gateway, "_workspace", unexpected)
+    for _ in range(20):
+        response = await client.get("/api/public/availability")
+        assert response.status_code == 200 and response.json()["available"] == 4
+    assert summaries == [1]
+    assert (await client.get("/api/public/availability")).status_code == 429
+
+
+async def test_seat_tick_skips_full_probes_and_active_operations(installation, monkeypatch):
+    app, client, node, space = await setup(installation)
+    snapshot(app, space["id"])
+    services = app.state.services
+    with app.state.db.begin() as db:
+        db.get(Workspace, space["id"]).seat_checked_at = now() - IDLE_SNAPSHOT_TTL - 1
+    services.pending_probes.add(space["id"])
+    services.seats.tick()
+    assert not services.seats.pending
+    services.pending_probes.clear()
+    async with services.lock(space["id"]):
+        services.seats.tick()
+        assert not services.seats.pending
+
+
+async def test_failed_recent_snapshot_retries_after_backoff(installation, monkeypatch):
+    app, client, node, space = await setup(installation)
+    snapshot(app, space["id"])
+    services = app.state.services
+    with app.state.db.begin() as db:
+        db.get(Workspace, space["id"]).seat_status = "permission_denied"
+    services.seats.retry_at[space["id"]] = now() + 300
+    services.seats.tick()
+    assert not services.seats.pending
+    services.seats.retry_at[space["id"]] = now() - 1
+    calls = []
+
+    async def page(*args, **kwargs):
+        calls.append(args[3])
+        return GatewayResult({"data": [], "has_more": False})
+
+    monkeypatch.setattr(services.gateway, "_workspace", page)
+    services.seats.tick()
+    await asyncio.gather(*list(services.tasks))
+    assert calls == ["users", "invites"]
+
+
+async def test_redemption_refreshes_display_snapshot_older_than_five_minutes(installation, monkeypatch):
+    app, client, node, space = await setup(installation)
+    snapshot(app, space["id"], total=2)
+    services = app.state.services
+    with app.state.db.begin() as db:
+        db.get(Workspace, space["id"]).seat_checked_at = now() - 600
+    # The display still has capacity, but allocation must discover the external
+    # member before consuming a code or reserving an invitation.
+    assert (await client.get("/api/public/availability")).json()["available"] == 1
+    calls = []
+
+    async def full(*args, **kwargs):
+        calls.append(args[3])
+        rows = [{"email": "one@example.com"}, {"email": "two@example.com"}] if args[3] == "users" else []
+        return GatewayResult({"data": rows, "has_more": False})
+
+    monkeypatch.setattr(services.gateway, "_workspace", full)
+    response = await redeem(client, (await generate(client))[0], "new@example.com")
+    assert response.status_code == 503
+    assert calls == ["users", "invites"]
+    with app.state.db() as db:
+        assert db.scalar(select(func.count()).select_from(Redemption)) == 0

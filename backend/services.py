@@ -557,7 +557,6 @@ class Services:
         if self.backups:
             self.backups.tick(self)
         self.automation.tick()
-        self.seats.tick()
         if now() - self.last_cleanup >= 3600:
             self.cleanup_logs()
         with self.db() as db:
@@ -571,6 +570,9 @@ class Services:
             if workspace_id in self.pending_probes or self.lock(workspace_id).locked():
                 continue
             self.schedule_probe(workspace_id)
+        # A scheduled full probe already collects seats. Register it first so
+        # the seat refresher does not enqueue another scan of the same space.
+        self.seats.tick()
 
     async def scheduler(self):
         while True:

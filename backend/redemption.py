@@ -19,6 +19,8 @@ def mount_redemption(app, admin, services, enabled):
     # Bounded per-process limits; never trust arbitrary X-Forwarded-For headers.
     attempts = OrderedDict()
     global_attempts = []
+    availability_cache = None
+    availability_cached_at = 0.0
 
     def limit(request):
         stamp = time.monotonic()
@@ -178,11 +180,16 @@ def mount_redemption(app, admin, services, enabled):
         return {"job_id": job_id}
 
     @public.get("/availability")
-    def availability(request: Request):
+    async def availability(request: Request):
+        nonlocal availability_cache, availability_cached_at
         if not enabled:
             raise HTTPException(404)
         limit(request)
-        return services.seats.summary()
+        stamp = time.monotonic()
+        if availability_cache is None or stamp - availability_cached_at >= 3:
+            availability_cache = services.seats.summary()
+            availability_cached_at = stamp
+        return availability_cache
 
     @public.post("/redeem")
     async def redeem(body: RedeemInput, request: Request):

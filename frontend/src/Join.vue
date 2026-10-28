@@ -3,15 +3,14 @@ import { ref, onMounted, onUnmounted } from "vue";
 import logoUrl from "./assets/teammanager.png";
 import { apiBase } from "./paths";
 const email = ref(""), code = ref(""), busy = ref(false), error = ref("");
-const available = ref<number | null>(null), capacityBusy = ref(false), capacityError = ref("");
+const available = ref<number | null>(null), capacityError = ref("");
 async function refreshCapacity() {
-  capacityBusy.value = true; capacityError.value = "";
+  capacityError.value = "";
   try {
     const response = await fetch(apiBase + "/public/availability", { credentials: "omit", cache: "no-store" });
     if (!response.ok) throw new Error("席位数据暂不可用");
     available.value = (await response.json()).available;
   } catch { available.value = null; capacityError.value = "席位数据暂不可用"; }
-  finally { capacityBusy.value = false; }
 }
 onMounted(refreshCapacity);
 const result = ref<{ status: string; message: string } | null>(null);
@@ -66,7 +65,6 @@ async function act(check = false) {
       <div class="join-heading"><h1>加入工作空间</h1></div>
       <div class="join-capacity" role="status">
         <div><span>当前可用席位</span><strong>{{ available === null ? '—' : available }}<small>席</small></strong></div>
-        <button type="button" :disabled="capacityBusy" @click="refreshCapacity">{{ capacityBusy ? '刷新中…' : '刷新席位' }}</button>
         <p v-if="capacityError" class="capacity-error">{{ capacityError }}</p>
       </div>
       <form @submit.prevent="act()">

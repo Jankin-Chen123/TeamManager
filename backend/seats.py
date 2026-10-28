@@ -10,7 +10,10 @@ from backend.models import Workspace, Node, SeatReservation, JobItem, Redemption
 from backend.security import token_hash
 from backend.upstream import UpstreamError, clean_page
 
+# Idle display can lag; real allocations retain the five-minute snapshot limit
+# and every invitation still forces an upstream check immediately before writing.
 SNAPSHOT_TTL = 300
+IDLE_SNAPSHOT_TTL = 1800
 HELD_STATES = {"reserved", "submitted", "uncertain"}
 BINDING_FIELDS = ("workspace_id", "node_id", "key_enc", "credential_type")
 
@@ -22,11 +25,11 @@ class Seats:
         self.pending = set()
         self.retry_at = {}
 
-    def fresh(self, workspace):
+    def fresh(self, workspace, max_age=SNAPSHOT_TTL):
         return (
             workspace.seat_status == "success"
             and workspace.seat_checked_at is not None
-            and now() - workspace.seat_checked_at <= SNAPSHOT_TTL
+            and now() - workspace.seat_checked_at <= max_age
         )
 
     def route_ready(self, node):
@@ -47,7 +50,7 @@ class Seats:
             )
         )
         reserved = len(held - occupied_emails)
-        fresh = self.fresh(workspace)
+        fresh = self.fresh(workspace, IDLE_SNAPSHOT_TTL)
         node = db.get(Node, workspace.node_id)
         eligible = bool(workspace.enabled and workspace.seat_limit > 0 and fresh and self.route_ready(node))
         available = max(0, workspace.seat_limit - workspace.member_count - workspace.invite_count - reserved)
@@ -71,7 +74,7 @@ class Seats:
             "available": sum(v["available"] for v in values),
             "ready_workspaces": sum(v["eligible"] for v in values),
             "checked_at": min((v["checked_at"] for v in values if v["eligible"]), default=None),
-            "snapshot_max_age_seconds": SNAPSHOT_TTL,
+            "snapshot_max_age_seconds": IDLE_SNAPSHOT_TTL,
         }
 
     async def collect(self, workspace, node, resource, trace=None):
@@ -204,7 +207,7 @@ class Seats:
         ):
             raise HTTPException(409, "该邮箱已有待处理申请；兑换码尚未使用")
         for workspace in db.scalars(select(Workspace).order_by(Workspace.name, Workspace.id)):
-            if self.info(db, workspace)["available"] > 0:
+            if self.fresh(workspace) and self.info(db, workspace)["available"] > 0:
                 return workspace
         raise HTTPException(503, "当前没有已确认的有效席位，请稍后重试；兑换码尚未使用")
 
@@ -282,10 +285,11 @@ class Seats:
                 for w in db.scalars(
                     select(Workspace).where(Workspace.enabled.is_(True), Workspace.seat_limit > 0)
                 )
-                if not self.fresh(w)
+                if w.id not in self.services.pending_probes
+                and not self.services.lock(w.id).locked()
+                and not self.fresh(w, IDLE_SNAPSHOT_TTL)
                 and self.route_ready(db.get(Node, w.node_id))
                 and self.retry_at.get(w.id, 0) <= now()
-                and (not w.seat_checked_at or now() - w.seat_checked_at >= SNAPSHOT_TTL)
             ]
         for wid in ids:
             if wid not in self.pending:

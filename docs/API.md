@@ -107,13 +107,13 @@ Credentials 中创建的 PAT、Platform API key、Admin key 与网页 `accessTok
 
 - `POST/PUT /api/workspaces[/{id}]`：增加 `seat_limit`，整数 0–100000，0 不参与分配。返回 `seat_limit` 和 `seats`（total/members/invites/reserved/available/eligible/fresh/checked_at/status）。旧空间默认 0，升级不会猜测购买席位数。
 - `POST /api/workspaces/{id}/refresh-seats`：手动分页核验全部成员与待接受邀请，原子保存占用快照。请求通过绑定节点，失败不回退直连。
-- `GET /api/public/availability`：返回 available、ready_workspaces、checked_at、snapshot_max_age_seconds；仅本机数据库读取，不触发上游请求。
+- `GET /api/public/availability`：返回 available、ready_workspaces、checked_at、snapshot_max_age_seconds；采用 3 秒服务端缓存，仅本机数据库读取，不触发上游请求，保留公开接口限流。
 - `POST /api/cdks`：新兑换码不绑定空间；兼容接收旧 workspace_id 字段但忽略。列表 workspace_id 为兑换后实际分配的本地空间 ID，未兑换为 null。
 - `POST /api/public/redeem`：有效码首次申请时核验可用池，串行选择空间并保存预留；全局邀请队列逐条执行。已兑换码只返回原收据，不重发请求。
 - `GET /api/workspaces/{id}/reservations`：管理员读取尚未反映到上游的预留编号和关联任务。
 - `POST /api/reservations/{id}/release`：管理员确认 `{"confirm":"预留编号"}` 后释放；排队或运行的任务不能释放。必须先到官方管理台核实，接口不撤销真实邀请，也不恢复已使用的兑换码。
 
-后台只对配置了总席位、启用且节点可用的空间维护 5 分钟占用快照。所有邀请（含管理员手动邀请）使用同一预留表、同一全局串行执行锁。失败释放，成功但尚未观察到的邀请及未知结果保留；下次在上游观察到邮箱后预留变为 reflected，避免重复扣除。0006 迁移保留已有兑换实际目的地，将未使用的旧码变成通用码，并为已有未完成/成功邀请保守补充预留。
+后台只对配置了总席位、启用且节点可用的空间维护 30 分钟展示快照；兑换分配及管理员邀请仍按 5 分钟有效期按需刷新。已有完整同步任务或空间操作进行中时不额外排队扫描。快照失败后的自动重试退避仍为 5 分钟。所有邀请（含管理员手动邀请）发送前强制重新核验，使用同一预留表、同一全局串行执行锁。失败释放，成功但尚未观察到的邀请及未知结果保留；下次在上游观察到邮箱后预留变为 reflected，避免重复扣除。0006 迁移保留已有兑换实际目的地，将未使用的旧码变成通用码，并为已有未完成/成功邀请保守补充预留。
 
 
 ## 异常恢复（v0.4.0）
